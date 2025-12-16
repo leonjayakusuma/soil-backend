@@ -1,1 +1,0 @@
-{"version":3,"file":"activityLevel.model.d.ts","sourceRoot":"","sources":["../../src/models/activityLevel.model.ts"],"names":[],"mappings":"AAAA,OAAO,EAGH,KAAK,EAGR,MAAM,sBAAsB,CAAC;AAE9B,MAAM,MAAM,aAAa,GAAG;IACxB,IAAI,EAAE,KAAK,GAAG,KAAK,GAAG,MAAM,CAAC;CAChC,CAAA;AAED,qBACa,kBAAmB,SAAQ,KAAK,CAAC,aAAa,CAAC;IAMxD,IAAI,EAAG,aAAa,CAAC,MAAM,CAAC,CAAC;CAChC"}

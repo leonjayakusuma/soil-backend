@@ -1,1 +1,0 @@
-{"version":3,"file":"healthGoal.model.d.ts","sourceRoot":"","sources":["../../src/models/healthGoal.model.ts"],"names":[],"mappings":"AAAA,OAAO,EAGH,KAAK,EAGR,MAAM,sBAAsB,CAAC;AAE9B,MAAM,MAAM,UAAU,GAAG;IACrB,IAAI,EAAE,aAAa,GAAG,qBAAqB,GAAG,aAAa,CAAC;CAC/D,CAAC;AAEF,qBACa,eAAgB,SAAQ,KAAK,CAAC,UAAU,CAAC;IAMlD,IAAI,EAAG,UAAU,CAAC,MAAM,CAAC,CAAC;CAC7B"}

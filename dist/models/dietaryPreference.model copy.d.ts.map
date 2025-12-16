@@ -1,1 +1,0 @@
-{"version":3,"file":"dietaryPreference.model copy.d.ts","sourceRoot":"","sources":["../../src/models/dietaryPreference.model copy.ts"],"names":[],"mappings":"AAAA,OAAO,EAGH,KAAK,EAGR,MAAM,sBAAsB,CAAC;AAE9B,MAAM,MAAM,iBAAiB,GAAG;IAC5B,IAAI,EAAE,KAAK,GAAG,YAAY,GAAG,OAAO,CAAC;CACxC,CAAC;AAEF,qBACa,sBAAuB,SAAQ,KAAK,CAAC,iBAAiB,CAAC;IAMhE,IAAI,EAAG,iBAAiB,CAAC,MAAM,CAAC,CAAC;CACpC"}

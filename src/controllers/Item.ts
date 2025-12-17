@@ -23,6 +23,10 @@ if (!JWT_SECRET) {
     console.error(
         "One or more environment variables are not set. Please refer sample.env for the required format.",
     );
+    // Don't exit in serverless - throw error instead
+    if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+        throw new Error('JWT_SECRET environment variable is required');
+    }
     process.exit(1);
 }
 

@@ -19,7 +19,6 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-validator": "^7.3.1",
-    "isomorphic-dompurify": "^2.34.0",
     "jsonwebtoken": "^9.0.3",
     "papaparse": "^5.5.3",
     "pg": "^8.16.3",

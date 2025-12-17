@@ -1,13 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import { body, validationResult, ValidationChain } from "express-validator";
-import DOMPurify from "isomorphic-dompurify";
 
-// Wrapper function to match express-validator's CustomSanitizer signature
+// Lightweight sanitizer that strips angle brackets to reduce XSS risk
+// without pulling in heavy DOM libraries (which break on serverless/ESM)
 const sanitizeInput = (value: any): string => {
-    if (typeof value === 'string') {
-        return DOMPurify.sanitize(value);
-    }
-    return String(value);
+    const str = typeof value === 'string' ? value : String(value);
+    // Remove basic HTML tags; adjust as needed
+    return str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 };
 
 /* Using a library to validate the types passed in */

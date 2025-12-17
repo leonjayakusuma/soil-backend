@@ -1,6 +1,10 @@
 import dotenv from 'dotenv';
 
-dotenv.config();
+// Only load .env file in development/local environments
+// Vercel automatically injects environment variables in production
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  dotenv.config();
+}
 
 interface Config {
   port: number;

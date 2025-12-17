@@ -1,3 +1,5 @@
+// Explicitly require pg to ensure it's available for Sequelize
+import 'pg';
 import { Sequelize } from 'sequelize-typescript';
 import config from './config.js';
 import { UserTable } from "../models/user.model";

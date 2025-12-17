@@ -1,4 +1,6 @@
 // api/index.ts
+// Explicitly import pg to ensure it's bundled with the function
+import 'pg';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import app from '../src/app';
 import { connectDatabase } from '../src/config/database';

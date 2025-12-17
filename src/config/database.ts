@@ -1,5 +1,11 @@
 // Explicitly require pg to ensure it's available for Sequelize
-import 'pg';
+// Using require to ensure synchronous loading before Sequelize initializes
+try {
+  require('pg');
+} catch (e) {
+  console.error('Failed to load pg module:', e);
+  throw new Error('pg module is required but not available. Please ensure pg is installed.');
+}
 import { Sequelize } from 'sequelize-typescript';
 import config from './config.js';
 import { UserTable } from "../models/user.model";

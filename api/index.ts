@@ -1,6 +1,12 @@
 // api/index.ts
-// Explicitly import pg to ensure it's bundled with the function
-import 'pg';
+// Explicitly require pg to ensure it's bundled with the function
+// Using require instead of import to ensure it's loaded synchronously
+try {
+  require('pg');
+} catch (e) {
+  console.error('Failed to load pg module:', e);
+}
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import app from '../src/app';
 import { connectDatabase } from '../src/config/database';

@@ -169,22 +169,49 @@ export async function getFullItemData(itemFromDb: ItemTable): Promise<Item> {
             tags = [];
         }
 
-        // Handle price - it should be a number but handle both cases
-        const price = typeof itemFromDb.price === 'string' 
-            ? parseFloat(itemFromDb.price) 
-            : itemFromDb.price;
+        // Handle price - ensure we get it correctly from Sequelize
+        // Try direct property access first, then getDataValue as fallback
+        let price: number | null | undefined = itemFromDb.price;
+        
+        // If price is undefined, try accessing via getDataValue (Sequelize method)
+        if (price === undefined) {
+            price = itemFromDb.getDataValue('price') as number | null | undefined;
+        }
+        
+        // Handle string conversion if needed (shouldn't happen but be safe)
+        if (typeof price === 'string') {
+            const parsed = parseFloat(price);
+            price = isNaN(parsed) ? null : parsed;
+        }
+        
+        // Debug logging for first few items to diagnose the issue
+        if (itemFromDb.id <= 3) {
+            console.log(`[DEBUG] Item ${itemFromDb.id} - price:`, {
+                directAccess: itemFromDb.price,
+                getDataValue: itemFromDb.getDataValue('price'),
+                finalPrice: price,
+                type: typeof price
+            });
+        }
 
+        // Only default to 0 if price is null or undefined, not if it's actually 0
+        const finalPrice = (price === null || price === undefined || (typeof price === 'number' && isNaN(price))) ? 0 : Number(price);
+
+        // Get plain object from Sequelize model to ensure all fields are accessible
+        const itemData = itemFromDb.toJSON ? itemFromDb.toJSON() : itemFromDb;
+        
+        // Use getDataValue as fallback for any missing fields
         return {
-            id: itemFromDb.id,
-            title: itemFromDb.title,
-            desc: itemFromDb.description,
-            price: price || 0,
-            discount: itemFromDb.discount,
+            id: itemData.id ?? itemFromDb.getDataValue('id'),
+            title: itemData.title ?? itemFromDb.getDataValue('title') ?? '',
+            desc: itemData.description ?? itemFromDb.getDataValue('description') ?? '',
+            price: finalPrice,
+            discount: itemData.discount ?? itemFromDb.getDataValue('discount') ?? 0,
             tags,
             reviewCount,
             reviewRating: Math.round(reviewRating * 100) / 100,
-            isSpecial: itemFromDb.isSpecial,
-            imgUrl: itemFromDb.imgUrl,
+            isSpecial: itemData.isSpecial ?? itemFromDb.getDataValue('isSpecial') ?? false,
+            imgUrl: itemData.imgUrl ?? itemFromDb.getDataValue('imgUrl') ?? undefined,
         };
     } catch (error) {
         console.error("Error in getFullItemData for item:", itemFromDb.id, error);

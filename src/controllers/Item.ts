@@ -261,18 +261,24 @@ export const getItemReviews = tryCatchHandler<Review[]>(async (req) => {
             {
                 model: UserTable,
                 attributes: ["name"],
+                required: false, // LEFT JOIN instead of INNER JOIN - don't filter out reviews with missing users
             },
         ],
     });
 
+    // Some legacy rows may reference a userId that no longer exists.
+    // In that case, `review.user` will be undefined; we use a fallback
+    // instead of filtering them out or throwing a TypeError.
     const reviews = reviewsFromDb.map((review) => ({
         id: review.id,
         userId: review.userId,
-        userName: review.user.name,
+        userName: review.user?.name || "Unknown User", // fallback for missing users
         itemId: review.itemId,
         rating: review.rating,
         reviewTxt: review.isDeleted ? "" : review.reviewTxt,
-        dateCreated: review.dateCreated.toISOString(),
+        dateCreated: review.dateCreated
+            ? review.dateCreated.toISOString()
+            : "",
         isDeleted: review.isDeleted,
         isFlagged: review.isFlagged,
     }));

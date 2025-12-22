@@ -87,6 +87,21 @@ router.post(
  *     summary: Check if email and name already exist
  *     tags:
  *       - User
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               name:
+ *                 type: string
+ *             required:
+ *               - email
+ *               - name
  *     responses:
  *       200:
  *         description: Existence check result.
@@ -241,6 +256,18 @@ router.get("/item", validatePositiveInt("itemId", query), getItem);
  *     summary: Get reviews for an item
  *     tags:
  *       - Item
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               itemId:
+ *                 type: integer
+ *                 minimum: 1
+ *             required:
+ *               - itemId
  *     responses:
  *       200:
  *         description: List of item reviews.

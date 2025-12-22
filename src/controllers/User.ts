@@ -522,7 +522,9 @@ export const getUserFollowings = tryCatchHandler<PublicUserInfo[]>(
             (following) => ({
                 id: following.id,
                 name: following.name,
-                dateJoined: following.dateJoined.toISOString(),
+                dateJoined: following.dateJoined
+                    ? following.dateJoined.toISOString()
+                    : "",
             }),
         );
 
@@ -714,17 +716,24 @@ export const getUserReviews = tryCatchHandler<Review[]>(
             ],
         });
 
-        const reviews = reviewsFromDb.map((review) => ({
-            id: review.id,
-            userId: review.userId,
-            userName: review.user.name,
-            itemId: review.itemId,
-            rating: review.rating,
-            reviewTxt: review.isDeleted ? "" : review.reviewTxt,
-            dateCreated: review.dateCreated.toISOString(),
-            isDeleted: review.isDeleted,
-            isFlagged: review.isFlagged,
-        }));
+        // Some legacy rows may reference a userId that no longer exists.
+        // In that case, `review.user` will be undefined; we guard against it
+        // instead of throwing a TypeError on `review.user.name`.
+        const reviews = reviewsFromDb
+            .filter((review) => review.user) // drop reviews with missing users
+            .map((review) => ({
+                id: review.id,
+                userId: review.userId,
+                userName: review.user!.name, // safe because of filter above
+                itemId: review.itemId,
+                rating: review.rating,
+                reviewTxt: review.isDeleted ? "" : review.reviewTxt,
+                dateCreated: review.dateCreated
+                    ? review.dateCreated.toISOString()
+                    : "",
+                isDeleted: review.isDeleted,
+                isFlagged: review.isFlagged,
+            }));
 
         return { msg: "Reviews found.", data: reviews };
     },

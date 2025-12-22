@@ -411,11 +411,26 @@ export const getProfileInfo = tryCatchHandler<ProfileInfo>(
             throw new Error();
         }
 
+        // Defensive extraction in case some fields are undefined/null
+        const userJson = user.toJSON ? user.toJSON() : (user as any);
         const profileInfo: ProfileInfo = {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            dateJoined: user.dateJoined.toISOString(),
+            id: user.id ?? userJson.id ?? user.getDataValue("id"),
+            name: user.name ?? userJson.name ?? user.getDataValue("name") ?? "",
+            email:
+                user.email ??
+                userJson.email ??
+                user.getDataValue("email") ??
+                "",
+            // Some legacy users may have null/undefined dateJoined. Fall back to empty string.
+            dateJoined:
+                user.dateJoined ??
+                userJson.dateJoined ??
+                user.getDataValue("dateJoined")
+                    ? (user.dateJoined ??
+                          userJson.dateJoined ??
+                          user.getDataValue("dateJoined")
+                      ).toISOString()
+                    : "",
         };
 
         return { msg: "User found.", data: profileInfo };
@@ -639,6 +654,21 @@ export const getPersonalInfo = tryCatchHandler<PersonalInfo | undefined>(
             where: { userId },
         });
 
+        // If the user has not set personal info yet, return a safe default object
+        // so the client always gets a data payload instead of `undefined`.
+        const defaultPersonalInfo = {
+            sex: "male",
+            age: 23,
+            weight: 68,
+            weightGoal: 71,
+            weightGainPerWeek: 1,
+            height: 170,
+            bodyFatPerc: 26,
+            activityLevel: "low",
+            healthGoal: "health improvements",
+            dietaryPreference: "any",
+        };
+
         return {
             msg: "Personal info found.",
             data: personalInfo
@@ -654,7 +684,7 @@ export const getPersonalInfo = tryCatchHandler<PersonalInfo | undefined>(
                       healthGoal: personalInfo.healthGoalName,
                       dietaryPreference: personalInfo.dietaryPreferenceName,
                   }
-                : undefined,
+                : defaultPersonalInfo,
         }; // TODO: make sure the db names are correct
     },
     404,

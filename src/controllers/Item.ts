@@ -5,6 +5,7 @@ import { Item, Review } from "../shared/types";
 import { tryCatchHandler, HttpError, Tokens } from ".";
 import { ItemTable } from "../models/item.model";
 import { TagTable } from "../models/tag.model";
+import { ItemTagTable } from "../models/itemTag.model";
 import sequelize from "../config/database";
 import { IngredientTable } from "../models/ingredient.model";
 import { RecipeTable } from "../models/recipe.model";
@@ -159,14 +160,54 @@ export async function getFullItemData(itemFromDb: ItemTable): Promise<Item> {
         const reviewCount = reviewsData[0]?.reviewCount || 0;
         const reviewRating = reviewsData[0]?.reviewRating || 0;
 
-        // Ensure tags are loaded - check if tags association exists
+        // Get plain object from Sequelize model to ensure all fields are accessible
+        const itemData = itemFromDb.toJSON ? itemFromDb.toJSON() : itemFromDb;
+        const itemDataWithTags = itemData as any; // Type assertion to access tags property
+
+        // Extract tags - check both the model instance and JSON representation
         let tags: string[] = [];
+        
+        // First try to get tags from the model instance (if include worked)
         if (itemFromDb.tags && Array.isArray(itemFromDb.tags) && itemFromDb.tags.length > 0) {
-            tags = itemFromDb.tags.map((tag) => tag.name);
-        } else {
-            // Tags might not be loaded, try to get them from the association
-            // This shouldn't happen if include is used, but handle it gracefully
-            tags = [];
+            tags = itemFromDb.tags.map((tag: any) => {
+                // Handle both TagTable instances and plain objects
+                return tag.name || tag.getDataValue?.('name') || tag;
+            });
+        } 
+        // If not found, try from the JSON representation
+        else if (itemDataWithTags.tags && Array.isArray(itemDataWithTags.tags) && itemDataWithTags.tags.length > 0) {
+            tags = itemDataWithTags.tags.map((tag: any) => {
+                // Handle both TagTable instances and plain objects
+                return tag.name || tag;
+            });
+        }
+        // Fallback: manually load tags if they weren't included
+        else {
+            try {
+                const itemTags = await ItemTagTable.findAll({
+                    where: { itemId: itemFromDb.id },
+                    attributes: ['tagName'],
+                    raw: true,
+                });
+                
+                tags = itemTags
+                    .map((itemTag: any) => itemTag.tagName)
+                    .filter((name: string | undefined) => name !== undefined && name !== null);
+            } catch (tagError) {
+                console.error(`Error loading tags for item ${itemFromDb.id}:`, tagError);
+                tags = [];
+            }
+        }
+        
+        // Debug logging for first few items to diagnose tag issues
+        if (itemFromDb.id <= 3) {
+            console.log(`[DEBUG] Item ${itemFromDb.id} - tags:`, {
+                itemFromDbTags: itemFromDb.tags,
+                itemDataTags: itemDataWithTags.tags,
+                finalTags: tags,
+                itemFromDbTagsType: typeof itemFromDb.tags,
+                itemDataTagsType: typeof itemDataWithTags.tags
+            });
         }
 
         // Handle price - ensure we get it correctly from Sequelize
@@ -196,9 +237,6 @@ export async function getFullItemData(itemFromDb: ItemTable): Promise<Item> {
 
         // Only default to 0 if price is null or undefined, not if it's actually 0
         const finalPrice = (price === null || price === undefined || (typeof price === 'number' && isNaN(price))) ? 0 : Number(price);
-
-        // Get plain object from Sequelize model to ensure all fields are accessible
-        const itemData = itemFromDb.toJSON ? itemFromDb.toJSON() : itemFromDb;
         
         // Use getDataValue as fallback for any missing fields
         return {

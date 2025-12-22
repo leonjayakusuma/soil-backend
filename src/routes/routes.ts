@@ -138,6 +138,27 @@ router.post(
  *     responses:
  *       200:
  *         description: Login successful.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 msg:
+ *                   type: string
+ *                   example: Logged in successfully.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 8
+ *                     name:
+ *                       type: string
+ *                       example: johndoe
+ *                     accessToken:
+ *                       type: string
+ *                     refreshToken:
+ *                       type: string
  */
 router.post(
     "/login",

@@ -192,10 +192,12 @@ export const logInUser = tryCatchHandler<{ id: number; name: string } & Tokens>(
             }
             refreshToken = refreshTokenRow.refreshToken;
         }
+        
+        console.log(user.id, user.dataValues.name)
 
         return {
             msg: "Logged in successfully.",
-            data: { id: user.id, name: user.name, accessToken, refreshToken },
+            data: { id: user.id, name: user.dataValues.name, accessToken, refreshToken },
         };
     },
 );

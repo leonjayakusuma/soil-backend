@@ -705,6 +705,14 @@ export const getUserCart = tryCatchHandler<CartItem[]>(
             userId: number;
         }; // try catch handler will handle the error and return 401
 
+        // Verify user exists
+        const user = await UserTable.findOne({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw new Error();
+        }
+
         const cartItemsFromDb = await CartItemTable.findAll({
             where: { userId },
         });
@@ -712,10 +720,10 @@ export const getUserCart = tryCatchHandler<CartItem[]>(
         const cartItems: CartItem[] = await Promise.all(
             cartItemsFromDb.map(async (cartItem) => {
                 const itemModel = await ItemTable.findOne({
-                    where: { id: cartItem.itemId },
+                    where: { id: cartItem.dataValues.itemId },
                 });
                 if (!itemModel) {
-                    throw new Error(`No item found with id ${cartItem.itemId}`);
+                    throw new Error(`No item found with id ${cartItem.dataValues.itemId}`);
                 }
                 const item = itemModel.get({ plain: true });
                 return {

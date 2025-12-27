@@ -130,8 +130,10 @@ router.post(
  *               email:
  *                 type: string
  *                 format: email
+ *                 default: "a@a.com"
  *               password:
  *                 type: string
+ *                 default: "a"
  *             required:
  *               - email
  *               - password

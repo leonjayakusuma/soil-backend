@@ -1,7 +1,7 @@
 {
   "name": "soil-backend",
   "version": "1.0.0",
-  "description": "Soil Backend API something something",
+  "description": "Soil Backend API",
   "license": "ISC",
   "author": "",
   "type": "commonjs",
@@ -10,7 +10,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tsx src/tests/test-api.ts"
   },
   "dependencies": {
     "@vercel/node": "^5.5.15",

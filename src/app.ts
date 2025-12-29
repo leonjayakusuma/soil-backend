@@ -12,7 +12,7 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 // Configure CORS to allow requests from Vercel domains and localhost
-const corsOptions = {
+const corsOptions: cors.CorsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     // Allow requests with no origin (like mobile apps, Postman, or same-origin requests)
     if (!origin) return callback(null, true);
@@ -39,14 +39,34 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'X-Requested-With'],
   exposedHeaders: ['Content-Type', 'Authorization'],
+  preflightContinue: false, // Let CORS middleware handle preflight
+  optionsSuccessStatus: 200, // Some legacy browsers (IE11) choke on 204
 };
 
 app.use(cors(corsOptions))
+
+// Explicitly handle OPTIONS requests for all routes (CORS preflight)
+// This ensures preflight requests get proper CORS headers
+app.options('*', (req: Request, res: Response) => {
+  const origin = req.headers.origin;
+  
+  // Set CORS headers
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+  
+  res.status(200).end();
+})
+
 // API key auth middleware (to be used only on protected route groups, e.g. `/api`)
 const apiAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  // Allow OPTIONS requests (CORS preflight) to pass through
+  // Allow OPTIONS requests (CORS preflight) to pass through without auth
   if (req.method === 'OPTIONS') {
-    return next();
+    return res.status(200).end();
   }
 
   if (!config.apiKey) {

@@ -11,16 +11,40 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 // Helper function to set CORS headers - use this everywhere to ensure consistency
+// This function MUST be called before any response is sent
 const setCorsHeaders = (req: Request, res: Response): void => {
-  const origin = req.headers.origin;
+  // Get origin from headers, or infer from referer if origin is missing
+  let origin = req.headers.origin;
+  
+  // Fallback: try to extract origin from referer header if origin is not present
+  if (!origin && req.headers.referer) {
+    try {
+      const refererUrl = new URL(req.headers.referer);
+      origin = refererUrl.origin;
+    } catch (e) {
+      // Invalid referer URL, ignore
+    }
+  }
   
   // Set CORS headers - always allow the requesting origin
   // Note: When credentials: true, we must use the specific origin, not '*'
   if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    // Always allow Vercel domains and localhost
+    const isAllowed = 
+      origin.includes('localhost') || 
+      origin.includes('127.0.0.1') || 
+      origin.includes('.vercel.app') || 
+      origin.includes('vercel.app');
+    
+    if (isAllowed || process.env.NODE_ENV === 'development') {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else {
+      // For other origins, allow but without credentials
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    }
   } else {
-    // No origin header (e.g., Postman, curl, same-origin) - don't set credentials
+    // No origin header (e.g., Postman, curl, same-origin) - allow all but no credentials
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
   
@@ -32,6 +56,36 @@ const setCorsHeaders = (req: Request, res: Response): void => {
 // CORS middleware - handle all CORS headers manually for better control
 // This MUST be before any routes to ensure headers are set on all responses
 app.use((req: Request, res: Response, next: NextFunction) => {
+  // Intercept the original end/send methods to ensure CORS headers are always set
+  const originalEnd = res.end;
+  const originalJson = res.json;
+  const originalSend = res.send;
+  
+  // Wrap res.end to ensure CORS headers are set
+  res.end = function(chunk?: any, encoding?: any) {
+    if (!res.headersSent) {
+      setCorsHeaders(req, res);
+    }
+    return originalEnd.call(this, chunk, encoding);
+  };
+  
+  // Wrap res.json to ensure CORS headers are set
+  res.json = function(body?: any) {
+    if (!res.headersSent) {
+      setCorsHeaders(req, res);
+    }
+    return originalJson.call(this, body);
+  };
+  
+  // Wrap res.send to ensure CORS headers are set
+  res.send = function(body?: any) {
+    if (!res.headersSent) {
+      setCorsHeaders(req, res);
+    }
+    return originalSend.call(this, body);
+  };
+  
+  // Set headers immediately for this request
   setCorsHeaders(req, res);
   
   // Handle OPTIONS requests (CORS preflight) - must return early

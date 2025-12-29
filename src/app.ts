@@ -19,13 +19,14 @@ const setCorsHeaders = (req: Request, res: Response): void => {
   // Fallback: try to extract origin from referer header if origin is not present
   if (!origin && req.headers.referer) {
     try {
-      const refererUrl = new URL(req.headers.referer);
-      origin = refererUrl.origin;
+      origin = req.headers.referer;
     } catch (e) {
       // Invalid referer URL, ignore
     }
   }
   
+  // console.log()
+
   // Set CORS headers - always allow the requesting origin
   // Note: When credentials: true, we must use the specific origin, not '*'
   if (origin) {

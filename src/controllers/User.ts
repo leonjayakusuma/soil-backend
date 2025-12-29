@@ -825,8 +825,6 @@ export const updatePersonalInfo = tryCatchHandler(
             userId: number;
         }; // try catch handler will handle the error and return 401
 
-        console.log("userId: ", userId);
-
         // Checking if the strings match
         if (
             !["low", "med", "high"].includes(activityLevel) ||
@@ -838,8 +836,10 @@ export const updatePersonalInfo = tryCatchHandler(
             throw new HttpError("Invalid personal info.", 403);
         }
 
-        // Prepare update data
-        const updateData = {
+        // Use upsert for a single atomic database operation (INSERT ... ON CONFLICT UPDATE)
+        // This is faster than findOrCreate + update as it's a single SQL query
+        const [, created] = await PersonalInfoTable.upsert({
+            userId,
             isMale,
             age,
             weight,
@@ -850,21 +850,9 @@ export const updatePersonalInfo = tryCatchHandler(
             activityLevelName: activityLevel as "low" | "med" | "high",
             healthGoalName: healthGoal as "weight loss" | "health improvements" | "muscle gain",
             dietaryPreferenceName: dietaryPreference as "any" | "vegetarian" | "vegan",
-        };
-
-        // Use findOrCreate to insert or update in a single optimized operation
-        const [personalInfo, created] = await PersonalInfoTable.findOrCreate({
-            where: { userId },
-            defaults: {
-                userId,
-                ...updateData,
-            },
+        }, {
+            conflictFields: ['userId'],
         });
-
-        // If it already existed, update it
-        if (!created) {
-            await personalInfo.update(updateData);
-        }
 
         return { 
             msg: created 

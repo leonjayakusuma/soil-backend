@@ -199,17 +199,6 @@ export async function getFullItemData(itemFromDb: ItemTable): Promise<Item> {
             }
         }
         
-        // Debug logging for first few items to diagnose tag issues
-        if (itemFromDb.id <= 3) {
-            console.log(`[DEBUG] Item ${itemFromDb.id} - tags:`, {
-                itemFromDbTags: itemFromDb.tags,
-                itemDataTags: itemDataWithTags.tags,
-                finalTags: tags,
-                itemFromDbTagsType: typeof itemFromDb.tags,
-                itemDataTagsType: typeof itemDataWithTags.tags
-            });
-        }
-
         // Handle price - ensure we get it correctly from Sequelize
         // Try direct property access first, then getDataValue as fallback
         let price: number | null | undefined = itemFromDb.price;
@@ -223,16 +212,6 @@ export async function getFullItemData(itemFromDb: ItemTable): Promise<Item> {
         if (typeof price === 'string') {
             const parsed = parseFloat(price);
             price = isNaN(parsed) ? null : parsed;
-        }
-        
-        // Debug logging for first few items to diagnose the issue
-        if (itemFromDb.id <= 3) {
-            console.log(`[DEBUG] Item ${itemFromDb.id} - price:`, {
-                directAccess: itemFromDb.price,
-                getDataValue: itemFromDb.getDataValue('price'),
-                finalPrice: price,
-                type: typeof price
-            });
         }
 
         // Only default to 0 if price is null or undefined, not if it's actually 0
@@ -287,6 +266,7 @@ export const getItem = tryCatchHandler<Item>(
 export const getAllItems = tryCatchHandler<Item[]>(
     async (_req) => {
         try {
+            // Fetch all items with tags in a single query
             const itemsFromDb = await ItemTable.findAll({
                 include: [
                     {
@@ -301,9 +281,75 @@ export const getAllItems = tryCatchHandler<Item[]>(
                 return { msg: "No items found", data: [] };
             }
 
-            const items = await Promise.all(
-                itemsFromDb.map((itemFromDb) => getFullItemData(itemFromDb)),
-            );
+            // Fetch all review aggregations in a single query (much faster than N+1 queries)
+            const itemIds = itemsFromDb.map(item => item.id);
+            const reviewsData = (await ReviewTable.findAll({
+                where: { 
+                    itemId: itemIds,
+                    isDeleted: false 
+                },
+                attributes: [
+                    'itemId',
+                    [sequelize.fn("COUNT", sequelize.col("itemId")), "reviewCount"],
+                    [sequelize.fn("AVG", sequelize.col("rating")), "reviewRating"],
+                ],
+                group: ["itemId"],
+                raw: true,
+            })) as unknown as Array<{
+                itemId: number;
+                reviewCount: string | number;
+                reviewRating: string | number | null;
+            }>;
+
+            // Create a map for O(1) lookup of review data
+            const reviewMap = new Map<number, { reviewCount: number; reviewRating: number }>();
+            reviewsData.forEach(review => {
+                reviewMap.set(review.itemId, {
+                    reviewCount: Number(review.reviewCount) || 0,
+                    reviewRating: review.reviewRating ? Math.round(Number(review.reviewRating) * 100) / 100 : 0,
+                });
+            });
+
+            // Process items in parallel without additional database queries
+            const items = itemsFromDb.map((itemFromDb) => {
+                const itemData = itemFromDb.toJSON ? itemFromDb.toJSON() : itemFromDb;
+                const itemDataWithTags = itemData as any;
+
+                // Extract tags
+                let tags: string[] = [];
+                if (itemFromDb.tags && Array.isArray(itemFromDb.tags) && itemFromDb.tags.length > 0) {
+                    tags = itemFromDb.tags.map((tag: any) => tag.name || tag.getDataValue?.('name') || tag);
+                } else if (itemDataWithTags.tags && Array.isArray(itemDataWithTags.tags) && itemDataWithTags.tags.length > 0) {
+                    tags = itemDataWithTags.tags.map((tag: any) => tag.name || tag);
+                }
+
+                // Get review data from map
+                const reviewData = reviewMap.get(itemFromDb.id) || { reviewCount: 0, reviewRating: 0 };
+
+                // Handle price
+                let price: number | null | undefined = itemFromDb.price;
+                if (price === undefined) {
+                    price = itemFromDb.getDataValue('price') as number | null | undefined;
+                }
+                if (typeof price === 'string') {
+                    const parsed = parseFloat(price);
+                    price = isNaN(parsed) ? null : parsed;
+                }
+                const finalPrice = (price === null || price === undefined || (typeof price === 'number' && isNaN(price))) ? 0 : Number(price);
+
+                return {
+                    id: itemData.id ?? itemFromDb.getDataValue('id'),
+                    title: itemData.title ?? itemFromDb.getDataValue('title') ?? '',
+                    desc: itemData.description ?? itemFromDb.getDataValue('description') ?? '',
+                    price: finalPrice,
+                    discount: itemData.discount ?? itemFromDb.getDataValue('discount') ?? 0,
+                    tags,
+                    reviewCount: reviewData.reviewCount,
+                    reviewRating: reviewData.reviewRating,
+                    isSpecial: itemData.isSpecial ?? itemFromDb.getDataValue('isSpecial') ?? false,
+                    imgUrl: itemData.imgUrl ?? itemFromDb.getDataValue('imgUrl') ?? undefined,
+                };
+            });
 
             return { msg: "All items fetched successfully", data: items };
         } catch (error) {

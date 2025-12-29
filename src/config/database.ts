@@ -40,7 +40,7 @@ const sequelize = new Sequelize(config.database_url, {
   pool: {
     max: 10,
     min: 2,
-    acquire: 10000,
+    acquire: 1000,
     idle: 5000,
     evict: 1000,
   },

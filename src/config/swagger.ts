@@ -2,6 +2,23 @@ import swaggerJsdoc from 'swagger-jsdoc'
 import path from 'path'
 import fs from 'fs'
 
+// Determine the base URL dynamically based on environment
+const getBaseUrl = (): string => {
+  // Vercel provides VERCEL_URL automatically
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  // Allow custom API_URL to be set
+  if (process.env.API_URL) {
+    return process.env.API_URL;
+  }
+  // Fall back to localhost for development
+  const port = process.env.PORT || '3000';
+  return `http://localhost:${port}`;
+};
+
+const baseUrl = getBaseUrl();
+
 const swaggerDefinition = {
   openapi: '3.0.0',
   info: {
@@ -11,8 +28,8 @@ const swaggerDefinition = {
   },
   servers: [
     {
-      url: 'http://localhost:3000',
-      description: 'Local dev server',
+      url: baseUrl,
+      description: process.env.VERCEL_URL ? 'Production server' : 'Local dev server',
     },
   ],
   components: {

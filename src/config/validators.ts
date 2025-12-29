@@ -128,12 +128,6 @@ export function validateAccessToken(
         (req: Request, res: Response, next: NextFunction): void | Response => {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                console.log("Access token validation errors:", JSON.stringify(errors.array(), null, 2));
-                console.log("Request body keys:", Object.keys(req.body || {}));
-                console.log("Request body accessToken exists:", paramName in (req.body || {}));
-                console.log("Request body accessToken type:", typeof req.body?.[paramName]);
-                console.log("Request body accessToken value (first 20 chars):", 
-                    req.body?.[paramName] ? String(req.body[paramName]).substring(0, 20) : "undefined");
                 return res.status(403).json({ msg: "Invalid access token" });
             }
             // Ensure it's a string (form-urlencoded should already be string, but just in case)

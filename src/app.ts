@@ -65,7 +65,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   // Wrap res.end to ensure CORS headers are set
   res.end = function(chunk?: any, encoding?: any) {
     if (!res.headersSent) {
-      setCorsHeaders(req, res);
+      // setCorsHeaders(req, res);
     }
     return originalEnd.call(this, chunk, encoding);
   };
@@ -73,7 +73,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   // Wrap res.json to ensure CORS headers are set
   res.json = function(body?: any) {
     if (!res.headersSent) {
-      setCorsHeaders(req, res);
+      // setCorsHeaders(req, res);
     }
     return originalJson.call(this, body);
   };
@@ -81,13 +81,13 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   // Wrap res.send to ensure CORS headers are set
   res.send = function(body?: any) {
     if (!res.headersSent) {
-      setCorsHeaders(req, res);
+      // setCorsHeaders(req, res);
     }
     return originalSend.call(this, body);
   };
   
   // Set headers immediately for this request
-  setCorsHeaders(req, res);
+  // setCorsHeaders(req, res);
   
   // Handle OPTIONS requests (CORS preflight) - must return early
   if (req.method === 'OPTIONS') {
@@ -106,7 +106,7 @@ const apiAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
   }
 
   if (!config.apiKey) {
-    setCorsHeaders(req, res);
+    // setCorsHeaders(req, res);
     return res.status(500).json({
       success: false,
       error: 'API key not configured on server',
@@ -128,7 +128,7 @@ const apiAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const apiKey = headerKey || queryKey;
 
   if (!apiKey) {
-    setCorsHeaders(req, res);
+    // setCorsHeaders(req, res);
     return res.status(401).json({
       success: false,
       error: 'Missing API key',
@@ -213,7 +213,7 @@ app.use('/api/protected', apiAuthMiddleware, protectedRouter)
 
 // 404 handler (must be after all routes)
 app.use((req: Request, res: Response) => {
-  setCorsHeaders(req, res);
+  // setCorsHeaders(req, res);
   res.status(404).json({
     success: false,
     message: `Route ${req.originalUrl} not found`,

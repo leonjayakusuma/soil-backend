@@ -220,6 +220,6 @@ app.use((req: Request, res: Response) => {
   })
 })
 
-app.use(errorHandler);
+app.use(errorHandler as any);
 
 export default app;

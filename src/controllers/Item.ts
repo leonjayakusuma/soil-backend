@@ -7,7 +7,7 @@ import { ItemTable } from "../models/item.model";
 import { TagTable } from "../models/tag.model";
 import { ItemTagTable } from "../models/itemTag.model";
 import sequelize from "../config/database";
-import { Op } from "sequelize";
+import { QueryTypes } from "sequelize";
 import { IngredientTable } from "../models/ingredient.model";
 import { RecipeTable } from "../models/recipe.model";
 import { Recipe } from "../shared/types";
@@ -267,92 +267,89 @@ export const getItem = tryCatchHandler<Item>(
 export const getAllItems = tryCatchHandler<Item[]>(
     async (_req) => {
         try {
-            // Fetch all items with tags in a single query
-            const itemsFromDb = await ItemTable.findAll({
-                include: [
-                    {
-                        model: TagTable,
-                        attributes: ["name"],
-                        through: { attributes: [] },
-                    },
-                ],
-            });
+            // Use a single optimized raw SQL query that combines items, tags, and review aggregations
+            // This avoids multiple round trips and large IN clauses, which are slow in production
+            const itemsWithTagsAndReviews = await sequelize.query<{
+                id: number;
+                title: string;
+                description: string;
+                price: number;
+                discount: number;
+                isSpecial: boolean;
+                imgUrl: string | null;
+                tagName: string | null;
+                reviewCount: string;
+                reviewRating: string | null;
+            }>(
+                `SELECT 
+                    i.id,
+                    i.title,
+                    i.description,
+                    i.price,
+                    i.discount,
+                    i."isSpecial",
+                    i."imgUrl",
+                    t.name as "tagName",
+                    COALESCE(r.review_count, '0') as "reviewCount",
+                    COALESCE(r.review_rating, '0') as "reviewRating"
+                FROM "Items" i
+                LEFT JOIN "ItemTags" it ON i.id = it."itemId"
+                LEFT JOIN "Tags" t ON it."tagName" = t.name
+                LEFT JOIN (
+                    SELECT 
+                        "itemId",
+                        COUNT(*)::text as review_count,
+                        ROUND(AVG("rating")::numeric, 2)::text as review_rating
+                    FROM "Reviews"
+                    WHERE "isDeleted" = false
+                    GROUP BY "itemId"
+                ) r ON i.id = r."itemId"
+                ORDER BY i.id, t.name`,
+                {
+                    type: QueryTypes.SELECT,
+                }
+            );
 
-            if (!itemsFromDb || itemsFromDb.length === 0) {
+            if (!itemsWithTagsAndReviews || itemsWithTagsAndReviews.length === 0) {
                 return { msg: "No items found", data: [] };
             }
 
-            // Fetch all review aggregations in a single optimized query
-            // Using Op.in explicitly ensures Sequelize generates efficient SQL
-            // This is important in production where query optimization matters more
-            const itemIds = itemsFromDb.map(item => item.id);
-            const reviewsData = itemIds.length > 0 ? (await ReviewTable.findAll({
-                where: { 
-                    itemId: { [Op.in]: itemIds },
-                    isDeleted: false 
-                },
-                attributes: [
-                    'itemId',
-                    [sequelize.fn("COUNT", sequelize.col("itemId")), "reviewCount"],
-                    [sequelize.fn("AVG", sequelize.col("rating")), "reviewRating"],
-                ],
-                group: ["itemId"],
-                raw: true,
-            })) as unknown as Array<{
-                itemId: number;
-                reviewCount: string | number;
-                reviewRating: string | number | null;
-            }> : [];
+            // Group by item and aggregate tags
+            const itemsMap = new Map<number, {
+                id: number;
+                title: string;
+                desc: string;
+                price: number;
+                discount: number;
+                isSpecial: boolean;
+                imgUrl?: string;
+                tags: string[];
+                reviewCount: number;
+                reviewRating: number;
+            }>();
 
-            // Create a map for O(1) lookup of review data
-            const reviewMap = new Map<number, { reviewCount: number; reviewRating: number }>();
-            reviewsData.forEach(review => {
-                reviewMap.set(review.itemId, {
-                    reviewCount: Number(review.reviewCount) || 0,
-                    reviewRating: review.reviewRating ? Math.round(Number(review.reviewRating) * 100) / 100 : 0,
-                });
+            itemsWithTagsAndReviews.forEach(row => {
+                if (!itemsMap.has(row.id)) {
+                    itemsMap.set(row.id, {
+                        id: row.id,
+                        title: row.title,
+                        desc: row.description,
+                        price: row.price || 0,
+                        discount: row.discount || 0,
+                        isSpecial: row.isSpecial || false,
+                        imgUrl: row.imgUrl || undefined,
+                        tags: [],
+                        reviewCount: Number(row.reviewCount) || 0,
+                        reviewRating: row.reviewRating ? Math.round(Number(row.reviewRating) * 100) / 100 : 0,
+                    });
+                }
+                const item = itemsMap.get(row.id)!;
+                if (row.tagName && !item.tags.includes(row.tagName)) {
+                    item.tags.push(row.tagName);
+                }
             });
 
-            // Process items in parallel without additional database queries
-            const items = itemsFromDb.map((itemFromDb) => {
-                const itemData = itemFromDb.toJSON ? itemFromDb.toJSON() : itemFromDb;
-                const itemDataWithTags = itemData as any;
-
-                // Extract tags
-                let tags: string[] = [];
-                if (itemFromDb.tags && Array.isArray(itemFromDb.tags) && itemFromDb.tags.length > 0) {
-                    tags = itemFromDb.tags.map((tag: any) => tag.name || tag.getDataValue?.('name') || tag);
-                } else if (itemDataWithTags.tags && Array.isArray(itemDataWithTags.tags) && itemDataWithTags.tags.length > 0) {
-                    tags = itemDataWithTags.tags.map((tag: any) => tag.name || tag);
-                }
-
-                // Get review data from map
-                const reviewData = reviewMap.get(itemFromDb.id) || { reviewCount: 0, reviewRating: 0 };
-
-                // Handle price
-                let price: number | null | undefined = itemFromDb.price;
-                if (price === undefined) {
-                    price = itemFromDb.getDataValue('price') as number | null | undefined;
-                }
-                if (typeof price === 'string') {
-                    const parsed = parseFloat(price);
-                    price = isNaN(parsed) ? null : parsed;
-                }
-                const finalPrice = (price === null || price === undefined || (typeof price === 'number' && isNaN(price))) ? 0 : Number(price);
-
-                return {
-                    id: itemData.id ?? itemFromDb.getDataValue('id'),
-                    title: itemData.title ?? itemFromDb.getDataValue('title') ?? '',
-                    desc: itemData.description ?? itemFromDb.getDataValue('description') ?? '',
-                    price: finalPrice,
-                    discount: itemData.discount ?? itemFromDb.getDataValue('discount') ?? 0,
-                    tags,
-                    reviewCount: reviewData.reviewCount,
-                    reviewRating: reviewData.reviewRating,
-                    isSpecial: itemData.isSpecial ?? itemFromDb.getDataValue('isSpecial') ?? false,
-                    imgUrl: itemData.imgUrl ?? itemFromDb.getDataValue('imgUrl') ?? undefined,
-                };
-            });
+            const items = Array.from(itemsMap.values());
 
             return { msg: "All items fetched successfully", data: items };
         } catch (error) {

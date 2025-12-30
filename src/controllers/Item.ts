@@ -116,25 +116,100 @@ export const getAllRecipes = tryCatchHandler<Recipe[]>(
 
 export const getSpecialItems = tryCatchHandler<Item[]>(
     async (_req) => {
-        const specialItemsFromDb = await ItemTable.findAll({
-            where: { isSpecial: true },
-            include: [
+        try {
+            // Use a single optimized raw SQL query that combines special items, tags, and review aggregations
+            // This avoids N+1 queries and is much faster than calling getFullItemData for each item
+            const specialItemsWithTagsAndReviews = await sequelize.query<{
+                id: number;
+                title: string;
+                description: string;
+                price: number;
+                discount: number;
+                isSpecial: boolean;
+                imgUrl: string | null;
+                tagName: string | null;
+                reviewCount: string;
+                reviewRating: string | null;
+            }>(
+                `SELECT 
+                    i.id,
+                    i.title,
+                    i.description,
+                    i.price,
+                    i.discount,
+                    i."isSpecial",
+                    i."imgUrl",
+                    t.name as "tagName",
+                    COALESCE(r.review_count, '0') as "reviewCount",
+                    COALESCE(r.review_rating, '0') as "reviewRating"
+                FROM "Items" i
+                LEFT JOIN "ItemTags" it ON i.id = it."itemId"
+                LEFT JOIN "Tags" t ON it."tagName" = t.name
+                LEFT JOIN (
+                    SELECT 
+                        "itemId",
+                        COUNT(*)::text as review_count,
+                        ROUND(AVG("rating")::numeric, 2)::text as review_rating
+                    FROM "Reviews"
+                    WHERE "isDeleted" = false
+                    GROUP BY "itemId"
+                ) r ON i.id = r."itemId"
+                WHERE i."isSpecial" = true
+                ORDER BY i.id, t.name`,
                 {
-                    model: TagTable,
-                    attributes: ["name"],
-                    through: { attributes: [] },
-                },
-            ],
-        });
+                    type: QueryTypes.SELECT,
+                }
+            );
 
-        const specials = await Promise.all(
-            specialItemsFromDb.map((itemFromDb) => getFullItemData(itemFromDb)),
-        );
+            if (!specialItemsWithTagsAndReviews || specialItemsWithTagsAndReviews.length === 0) {
+                return { msg: "Special items fetched successfully", data: [] };
+            }
 
-        return {
-            msg: "Special items fetched successfully",
-            data: specials,
-        };
+            // Group by item and aggregate tags
+            const itemsMap = new Map<number, {
+                id: number;
+                title: string;
+                desc: string;
+                price: number;
+                discount: number;
+                isSpecial: boolean;
+                imgUrl?: string;
+                tags: string[];
+                reviewCount: number;
+                reviewRating: number;
+            }>();
+
+            specialItemsWithTagsAndReviews.forEach(row => {
+                if (!itemsMap.has(row.id)) {
+                    itemsMap.set(row.id, {
+                        id: row.id,
+                        title: row.title,
+                        desc: row.description,
+                        price: row.price || 0,
+                        discount: row.discount || 0,
+                        isSpecial: row.isSpecial || false,
+                        imgUrl: row.imgUrl || undefined,
+                        tags: [],
+                        reviewCount: Number(row.reviewCount) || 0,
+                        reviewRating: row.reviewRating ? Math.round(Number(row.reviewRating) * 100) / 100 : 0,
+                    });
+                }
+                const item = itemsMap.get(row.id)!;
+                if (row.tagName && !item.tags.includes(row.tagName)) {
+                    item.tags.push(row.tagName);
+                }
+            });
+
+            const specials = Array.from(itemsMap.values());
+
+            return {
+                msg: "Special items fetched successfully",
+                data: specials,
+            };
+        } catch (error) {
+            console.error("Error in getSpecialItems:", error);
+            throw error;
+        }
     },
     500,
     "Failed to fetch special items",

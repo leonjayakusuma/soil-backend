@@ -7,6 +7,7 @@ import { ItemTable } from "../models/item.model";
 import { TagTable } from "../models/tag.model";
 import { ItemTagTable } from "../models/itemTag.model";
 import sequelize from "../config/database";
+import { QueryTypes, Op } from "sequelize";
 import { IngredientTable } from "../models/ingredient.model";
 import { RecipeTable } from "../models/recipe.model";
 import { Recipe } from "../shared/types";
@@ -281,11 +282,13 @@ export const getAllItems = tryCatchHandler<Item[]>(
                 return { msg: "No items found", data: [] };
             }
 
-            // Fetch all review aggregations in a single query (much faster than N+1 queries)
+            // Fetch all review aggregations in a single optimized query
+            // Using Op.in explicitly ensures Sequelize generates efficient SQL
+            // This is important in production where query optimization matters more
             const itemIds = itemsFromDb.map(item => item.id);
-            const reviewsData = (await ReviewTable.findAll({
+            const reviewsData = itemIds.length > 0 ? (await ReviewTable.findAll({
                 where: { 
-                    itemId: itemIds,
+                    itemId: { [Op.in]: itemIds },
                     isDeleted: false 
                 },
                 attributes: [
@@ -299,7 +302,7 @@ export const getAllItems = tryCatchHandler<Item[]>(
                 itemId: number;
                 reviewCount: string | number;
                 reviewRating: string | number | null;
-            }>;
+            }> : [];
 
             // Create a map for O(1) lookup of review data
             const reviewMap = new Map<number, { reviewCount: number; reviewRating: number }>();

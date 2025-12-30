@@ -41,9 +41,9 @@ const sequelize = new Sequelize(config.database_url, {
     // Serverless-friendly pool settings
     // In serverless (Vercel), functions are ephemeral, so we use different settings
     max: process.env.VERCEL ? 5 : 10, // Lower max for serverless
-    min: process.env.VERCEL ? 0 : 2, // No persistent connections in serverless
+    min: process.env.VERCEL ? 1 : 2, // Keep at least 1 connection warm in production for better performance
     acquire: process.env.VERCEL ? 30000 : 10000, // Longer timeout for serverless cold starts
-    idle: process.env.VERCEL ? 10000 : 5000, // Shorter idle time for serverless
+    idle: process.env.VERCEL ? 30000 : 5000, // Longer idle time in production to keep connections warm
     evict: process.env.VERCEL ? 1000 : 1000,
   },
   models: [UserTable,

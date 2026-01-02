@@ -943,23 +943,25 @@ export const updateItemQuantityFromCart = tryCatchHandler(
             throw new Error();
         }
 
-        // Check if item exists in cart, if so then subtract one to the quantity
-        // const cartItem = await CartItemTable.findOne({
-        //     where: { userId, itemId },
-        // });
+        // Check if item exists in cart
+        const cartItem = await CartItemTable.findOne({
+            where: { userId, itemId },
+        });
 
-        // if (cartItem) {
+        if (!cartItem) {
+            throw new HttpError("Item not found in cart.", 404);
+        }
+
         if (quantity == 0) {
             await CartItemTable.destroy({ where: { userId, itemId } });
+            return { msg: "Item removed from cart successfully." };
         } else {
             await CartItemTable.update(
                 { quantity },
                 { where: { userId, itemId } },
             );
+            return { msg: "Cart item quantity updated successfully." };
         }
-        // }
-
-        return { msg: "Item removed from cart successfully." };
     },
     404,
     "User not found.",
@@ -1012,6 +1014,23 @@ export const deleteItemFromCart = tryCatchHandler(
         ) as {
             userId: number;
         }; // try catch handler will handle the error and return 401
+
+        // Verify user exists
+        const user = await UserTable.findOne({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw new Error();
+        }
+
+        // Check if item exists in cart
+        const cartItem = await CartItemTable.findOne({
+            where: { userId, itemId },
+        });
+
+        if (!cartItem) {
+            throw new HttpError("Item not found in cart.", 404);
+        }
 
         await CartItemTable.destroy({ where: { userId, itemId } });
 

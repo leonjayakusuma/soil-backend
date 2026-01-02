@@ -717,6 +717,11 @@ export const getUserCart = tryCatchHandler<CartItem[]>(
             where: { userId },
         });
 
+        console.log(cartItemsFromDb[0]?.dataValues)
+        if (!cartItemsFromDb.length || !cartItemsFromDb[0]) {
+            throw new Error("No cart items found.");
+        }
+
         const cartItems: CartItem[] = await Promise.all(
             cartItemsFromDb.map(async (cartItem) => {
                 const itemModel = await ItemTable.findOne({
@@ -728,7 +733,7 @@ export const getUserCart = tryCatchHandler<CartItem[]>(
                 const item = itemModel.get({ plain: true });
                 return {
                     item,
-                    quantity: cartItem.quantity,
+                    quantity: cartItem.dataValues.quantity,
                 };
             }),
         );

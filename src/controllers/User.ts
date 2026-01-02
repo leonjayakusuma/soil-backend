@@ -877,20 +877,32 @@ export const addItemToCart = tryCatchHandler(
             userId: number;
         }; // try catch handler will handle the error and return 401
 
+        // Verify user exists
+        const user = await UserTable.findOne({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw new Error();
+        }
+
         // Check if item exists in cart, if so then add one to the quantity
         const cartItem = await CartItemTable.findOne({
             where: { userId, itemId },
         });
 
         if (cartItem) {
-            if (cartItem.quantity > 255) {
+            const currentQuantity = Number(cartItem.dataValues.quantity);
+            if (isNaN(currentQuantity) || currentQuantity < 1) {
+                throw new HttpError("Invalid cart item quantity.", 400);
+            }
+            if (currentQuantity > 255) {
                 throw new HttpError("Item quantity limit reached.", 403);
             }
-            // if (cartItem.quantity >= 255) { Just handle this client side and even if someone sends a fetch request to do this it will still error out of the trycatchhandler because of mysql
+            // if (currentQuantity >= 255) { Just handle this client side and even if someone sends a fetch request to do this it will still error out of the trycatchhandler because of mysql
             //     throw new HttpError("Item quantity limit reached.", 403);
             // }
             await CartItemTable.update(
-                { quantity: cartItem.quantity + 1 },
+                { quantity: currentQuantity + 1 },
                 { where: { userId, itemId } },
             );
         } else {
@@ -922,6 +934,14 @@ export const updateItemQuantityFromCart = tryCatchHandler(
         ) as {
             userId: number;
         }; // try catch handler will handle the error and return 401
+
+        // Verify user exists
+        const user = await UserTable.findOne({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw new Error();
+        }
 
         // Check if item exists in cart, if so then subtract one to the quantity
         // const cartItem = await CartItemTable.findOne({
@@ -1012,6 +1032,14 @@ export const clearCart = tryCatchHandler(
         ) as {
             userId: number;
         }; // try catch handler will handle the error and return 401
+
+        // Verify user exists
+        const user = await UserTable.findOne({
+            where: { id: userId },
+        });
+        if (!user) {
+            throw new Error();
+        }
 
         await CartItemTable.destroy({ where: { userId } });
 
